@@ -87,14 +87,5 @@ Size 24x24 pixels
 * The **Old field name** must match the existing name (comparison is case-insensitive, but spacing and punctuation matter).
 * Some footprints may expose data only via the Fields API; this plugin tries both APIs.
 
-**I want a toolbar button**
-
-* In `defaults()` the code sets `self.show_toolbar_button = True` (if supported).
-  Provide an icon via `self.icon_file_name = "your_icon.png"`.
-
 ---
 
-
----
-
-If you want, I can now write the **separate README** for the *schematic field re-ordering* script (single-file only, as you requested), also in English and GitHub-ready.
