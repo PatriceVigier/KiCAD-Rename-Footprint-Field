@@ -89,3 +89,6 @@ Size 24x24 pixels
 
 ---
 
+## License
+
+MIT.
