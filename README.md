@@ -33,7 +33,7 @@ For each footprint on the open board:
 
 ## Installation
 
-1. Save the plugin file as, e.g., `rename_field_plugin.py`.
+1. Save the plugin file as, e.g., `rename_field_plugin_pcb.py`.
 2. Place it in your KiCad user plugins folder (create folders if needed):
 
 * **Windows**
