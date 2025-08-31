@@ -4,8 +4,7 @@ This KiCad Action Plugin renames (or copies) a custom field on **all footprints*
 A dialog lets you enter:
 
 * **Old field name** (to find)
-* **New field name** (to create/rename to)
-* **Copy instead of rename** (keep old field)
+* **New field name** (rename to)
 
 It works with boards whose footprints expose either:
 
@@ -22,8 +21,7 @@ For each footprint on the open board:
 
 1. If a field named like the **Old field name** exists (case-insensitive match):
 
-   * If **Copy instead of rename** is checked: creates/overwrites **New field name** with the same value and **keeps** the old field.
-   * Otherwise: **renames** it to **New field name** (or creates the new property then removes the old, depending on which API is available).
+**renames** it to **New field name** (or creates the new property then removes the old, depending on which API is available).
 2. Refreshes the PCB view when done.
 3. Shows a summary: occurrences found and footprints modified.
 
@@ -66,7 +64,6 @@ Size 24x24 pixels
 
    * **Old field name** (e.g. `PART NUMBER`)
    * **New field name** (e.g. `MPN`)
-   * **Copy instead of rename** (check to keep the old field too)
 4. Click **OK**.
    A message box will summarize what was found and modified.
 
