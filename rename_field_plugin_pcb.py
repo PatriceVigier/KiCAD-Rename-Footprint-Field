@@ -137,6 +137,7 @@ class _RenameDialog(wx.Dialog):
 
 class RenameFieldPlugin(pcbnew.ActionPlugin):
     def defaults(self):
+        import os
         self.name = "Rename field…"
         self.category = "Modify footprints"
         self.description = "Rename/duplicate a footprint field across all footprints on the open PCB."
@@ -144,8 +145,10 @@ class RenameFieldPlugin(pcbnew.ActionPlugin):
             self.show_toolbar_button = True
         except Exception:
             pass
-        self.icon_file_name = ""  # put a .png next to it if you want an icon
-
+        # put a .png image in the same folder if you want an icon
+        self.show_toolbar_button = False  # Change to True to see it in the toolbar KiCad 7/8/9 supports this
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), "v_rename.png") #Image by Freeimages.com
+        
     def Run(self):
         board = pcbnew.GetBoard()
 
