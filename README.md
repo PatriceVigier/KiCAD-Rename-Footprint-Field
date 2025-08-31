@@ -47,11 +47,14 @@ For each footprint on the open board:
 * **Linux**
   `~/.local/share/kicad/9.0/scripting/plugins/`
 
-3. (Optional) Put a `.png` icon in the script folder and set `self.icon_file_name` line 147`.
-For example         self.icon_file_name = "myIcone.png"  # put a .png next to it if you want an icon
+3. (Optional) Put a `.png` icon in the script folder and set `self.icon_file_name` around line 150`.
+For example
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), "v_rename.png") #Image by Freeimages.com
 Size 24x24 pixels
+4. If you want it to show in the toobar change False to True
+        self.show_toolbar_button = False  # Change to True to see it in the toolbar KiCad 7/8/9 supports this
 
-4. Restart KiCad (or at least restart PCB Editor) so the plugin is discovered.
+5. Restart KiCad (or at least restart PCB Editor) so the plugin is discovered.
 
 ---
 
