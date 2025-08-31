@@ -70,6 +70,16 @@ Size 24x24 pixels
 4. Click **OK**.
    A message box will summarize what was found and modified.
 
+5. Synchronize with schematic (optional but recommended)
+After renaming fields on the PCB, open the Schematic Editor and go to
+Tools → Update Schematic from PCB.
+
+In the dialog, make sure “Update field values” is checked.
+
+This will propagate the renamed field(s) (e.g. PART NUMBER → MPN) back into the schematic symbols so they stay consistent.
+
+⚠️ Note: schematic-only fields not linked to the PCB will not be renamed by this plugin. If needed, use the separate reorder/rename schematic script to update those.
+
 ---
 
 ## Safety & Undo
