@@ -1,25 +1,43 @@
-#Rename field  in the KiCAD PCB Foot Print
 # -*- coding: utf-8 -*-
-# Rename field plugin with dialog for KiCad 9
+# KiCad 9 Action Plugin — Rename footprint field (rename only)
+#
+# This plugin renames a field/property across all footprints in the open PCB.
+# Example: "PART NUMBER" → "MPN"
+#
+# Usage:
+#   - Install this file into your KiCad user plugin folder
+#   - In PCB Editor, go to Tools → External Plugins → Rename field…
+#   - A dialog will let you type the old field name and the new one
+#   - The plugin will update every footprint on the current board
+#
+# Author: Patrice Vigier (MIT License)
+
 import pcbnew
 import wx
+import os
 
-def _rename_fields_on_board(board, old_field, new_field, copy_instead):
+def _rename_fields_on_board(board, old_field, new_field):
     """
-    Renamee (or copy) old_field -> new_field on all foot print.
-    Supported by two API :
-      - A) Properties (GetProperties / SetProperty / HasProperty / ClearProperty)
-      - B) Fields (GetFields / SetName / GetText)
+    Rename old_field -> new_field on all footprints in the given board.
+
+    Supports two APIs, depending on how the field is stored:
+      A) Properties (GetProperties / SetProperty / ClearProperty)
+      B) Fields (GetFields / SetName / GetText)
+
+    Returns:
+      count_modified: number of footprints actually changed
+      count_found: total number of footprints where the old_field was found
     """
-    old_l = (old_field or "").strip().lower()
+    old_l = (old_field or "").strip().lower()  # normalized lowercase match
     count_modified = 0
     count_found = 0
 
+    # Iterate through every footprint on the board
     for fp in board.GetFootprints():
 
-        # ---------- CASE A: property dictionary ----------
+        # ---------- CASE A: Property dictionary ----------
         try:
-            props = fp.GetProperties()  # may not exist depending on builds
+            props = fp.GetProperties()  # Some builds may not support this
             match_key = None
             for k in list(props.keys()):
                 if (k or "").strip().lower() == old_l:
@@ -27,158 +45,148 @@ def _rename_fields_on_board(board, old_field, new_field, copy_instead):
                     break
 
             if match_key is not None:
+                # Found a match
                 count_found += 1
                 value = props[match_key]
-                # write/overwrite the new property
+
+                # Create or overwrite the new property
                 try:
                     fp.SetProperty(new_field, value)
                 except AttributeError:
-                    # possible fallback if SetProperty does not exist
+                    # Fallback if SetProperty is missing
                     props[new_field] = value
-                if not copy_instead:
-                    try:
-                        # some versions have ClearProperty/UnsetProperty
-                        fp.ClearProperty(match_key)
-                    except Exception:
-                        del props[match_key]
-                count_modified += 1
-                continue  # we have processed by properties, move on to the next print
-        except AttributeError:
-            pass  # no GetProperties() on this build → try by Fields
 
-        # ---------- CASE B: Fields (named text) ----------
+                # Remove the old property
+                try:
+                    fp.ClearProperty(match_key)
+                except Exception:
+                    try:
+                        del props[match_key]
+                    except Exception:
+                        pass
+
+                count_modified += 1
+                continue  # Done with this footprint, go to next
+        except AttributeError:
+            # This KiCad build does not expose GetProperties()
+            pass
+
+        # ---------- CASE B: Fields (textual named fields) ----------
         try:
-            fields = fp.GetFields()  # list of named fields
+            fields = fp.GetFields()  # Some builds may not support this either
         except AttributeError:
             fields = []
 
-        done_here = False
+        renamed_here = False
         for fld in fields:
+            # Compare field names in lowercase
             name = (getattr(fld, "GetName", lambda: "")() or "").strip().lower()
             if name == old_l:
                 count_found += 1
-                value = (getattr(fld, "GetText", lambda: "")() or "")
-                if copy_instead:
-                    # duplicate: create a new field/property
+                try:
+                    # Try to rename directly in place
+                    fld.SetName(new_field)
+                except Exception:
+                    # Fallback: create a new property instead (so value is preserved)
                     try:
-                        fp.SetProperty(new_field, value)   # preference: property
+                        value = (getattr(fld, "GetText", lambda: "")() or "")
+                        fp.SetProperty(new_field, value)
                     except Exception:
-                        # otherwise, duplicate the field (if API available)
-                        try:
-                            fld2 = fld.Duplicate()          # not always present
-                            fld2.SetName(new_field)
-                            fp.Add(fld2)
-                        except Exception:
-                            pass
-                else:
-                    # rename: if possible, change the name of the field in place
-                    try:
-                        fld.SetName(new_field)
-                    except Exception:
-                        # fallback: create the new property then (if possible) delete the old one
-                        try:
-                            fp.SetProperty(new_field, value)
-                        except Exception:
-                            pass
-                        # no safe API to remove the field on all builds → we leave it
                         pass
                 count_modified += 1
-                done_here = True
+                renamed_here = True
                 break
 
-        if done_here:
+        if renamed_here:
             continue
 
+    # Refresh PCB editor so changes are visible immediately
     pcbnew.Refresh()
     return count_modified, count_found
 
 
-
 class _RenameDialog(wx.Dialog):
-    def __init__(self, parent, default_old="PART NUMBER", default_new="MPN", default_copy=False):
-        super().__init__(parent, title="Rename footprint field", style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-        self.SetSize(wx.Size(420, 200))
+    """Simple dialog box asking for old/new field names."""
+
+    def __init__(self, parent, default_old="OLDname", default_new="NEWname"):
+        super().__init__(parent, title="Rename footprint field",
+                         style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        self.SetSize(wx.Size(420, 170))
 
         s = wx.BoxSizer(wx.VERTICAL)
 
-        # Old field
+        # Old field name input
         row1 = wx.BoxSizer(wx.HORIZONTAL)
-        row1.Add(wx.StaticText(self, label="Old field name:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        row1.Add(wx.StaticText(self, label="Old field name:"), 0,
+                 wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
         self.txt_old = wx.TextCtrl(self, value=default_old)
         row1.Add(self.txt_old, 1, wx.EXPAND)
         s.Add(row1, 0, wx.ALL | wx.EXPAND, 8)
 
-        # New field
+        # New field name input
         row2 = wx.BoxSizer(wx.HORIZONTAL)
-        row2.Add(wx.StaticText(self, label="New field name:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        row2.Add(wx.StaticText(self, label="New field name:"), 0,
+                 wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
         self.txt_new = wx.TextCtrl(self, value=default_new)
         row2.Add(self.txt_new, 1, wx.EXPAND)
         s.Add(row2, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 8)
 
-        # Copy vs move
-        self.chk_copy = wx.CheckBox(self, label="Copy instead of rename (keep old field)")
-        self.chk_copy.SetValue(default_copy)
-        s.Add(self.chk_copy, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        # Buttons
+        # OK/Cancel buttons
         btns = self.CreateSeparatedButtonSizer(wx.OK | wx.CANCEL)
         s.Add(btns, 0, wx.ALL | wx.EXPAND, 8)
 
         self.SetSizerAndFit(s)
 
     def get_values(self):
-        return (
-            self.txt_old.GetValue().strip(),
-            self.txt_new.GetValue().strip(),
-            self.chk_copy.IsChecked(),
-        )
-
+        """Return tuple (old_field, new_field) from dialog."""
+        return (self.txt_old.GetValue().strip(),
+                self.txt_new.GetValue().strip())
 
 
 class RenameFieldPlugin(pcbnew.ActionPlugin):
+    """KiCad Action Plugin wrapper for the rename function."""
+
     def defaults(self):
-        import os
-        self.name = "Rename field…"
+        self.name = "Rename field… (rename only)"
         self.category = "Modify footprints"
-        self.description = "Rename/duplicate a footprint field across all footprints on the open PCB."
+        self.description = "Rename a footprint field/property across all footprints on the open PCB."
+        # Show button in External Plugins toolbar
         try:
             self.show_toolbar_button = True
         except Exception:
             pass
-        # put a .png image in the same folder if you want an icon
-        self.show_toolbar_button = False  # Change to True to see it in the toolbar KiCad 7/8/9 supports this
-        self.icon_file_name = os.path.join(os.path.dirname(__file__), "v_rename.png") #Image by Freeimages.com
-        
+        # Optional icon (must exist as PNG in same folder)
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), "v_rename.png")
+
     def Run(self):
         board = pcbnew.GetBoard()
+        dlg = _RenameDialog(None, "OLDname", "NEWname")
 
-        # Default values ​​(change here if you want other default values)
-        default_old = "Old Name"
-        default_new = "New Name"
-        default_copy = False
-
-        # Dialog
-        dlg = _RenameDialog(None, default_old, default_new, default_copy)
         if dlg.ShowModal() != wx.ID_OK:
             dlg.Destroy()
             return
-        old_field, new_field, copy_instead = dlg.get_values()
+        old_field, new_field = dlg.get_values()
         dlg.Destroy()
 
+        # Basic checks
         if not old_field or not new_field:
-            wx.MessageBox("Please fill both field names.", "Rename field", wx.ICON_WARNING)
+            wx.MessageBox("Please fill both field names.",
+                          "Rename field", wx.ICON_WARNING)
             return
         if old_field.strip().lower() == new_field.strip().lower():
-            wx.MessageBox("Old and new field names are identical.", "Rename field", wx.ICON_WARNING)
+            wx.MessageBox("Old and new field names are identical.",
+                          "Rename field", wx.ICON_WARNING)
             return
 
-        modified, found = _rename_fields_on_board(board, old_field, new_field, copy_instead)
+        # Perform the renaming
+        modified, found = _rename_fields_on_board(board, old_field, new_field)
 
-        # Summary
-        verb = "copied" if copy_instead else "renamed"
-        msg = (f"{verb.capitalize()} {found} occurrence(s) of '{old_field}' "
-               f"→ '{new_field}'.\nModified footprints: {modified}.")
-        wx.MessageBox(msg, "Rename field", wx.ICON_INFORMATION)
+        # Show summary
+        wx.MessageBox(
+            f"Renamed {found} occurrence(s) of '{old_field}' → '{new_field}'.\n"
+            f"Modified footprints: {modified}.",
+            "Rename field", wx.ICON_INFORMATION
+        )
 
-# Plugin Registration
+# Register the plugin with KiCad
 RenameFieldPlugin().register()
