@@ -1,4 +1,4 @@
-#Rename field  in the PCB Foot Print
+#Rename field  in the KiCAD PCB Foot Print
 # -*- coding: utf-8 -*-
 # Rename field plugin with dialog for KiCad 9
 import pcbnew
